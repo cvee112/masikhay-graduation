@@ -9,13 +9,11 @@
             content="Check your graduation payment balance - Batch Masikhay 2026"
         />
 
-        <!-- Favicon (purple graduation cap emoji as SVG) -->
         <link
             rel="icon"
             href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>"
         />
 
-        <!-- Tailwind CSS via CDN -->
         <script src="https://cdn.tailwindcss.com"></script>
         <script>
             tailwind.config = {
@@ -41,7 +39,6 @@
         </script>
 
         <style>
-            /* Custom animations */
             @keyframes shimmer {
                 0% {
                     background-position: -200% 0;
@@ -73,7 +70,18 @@
             .fade-in {
                 animation: fadeIn 0.3s ease-out forwards;
             }
-            /* Smooth scrollbar */
+            @keyframes pulse {
+                0%,
+                100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.7;
+                }
+            }
+            .pulse {
+                animation: pulse 2s infinite;
+            }
             ::-webkit-scrollbar {
                 width: 8px;
                 height: 8px;
@@ -95,7 +103,6 @@
     >
         <div id="app"></div>
 
-        <!-- React via CDN -->
         <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
         <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
         <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -107,16 +114,18 @@
             // CONFIGURATION - UPDATE THESE VALUES
             // ============================================================
             const CONFIG = {
-                // Replace with your deployed Google Apps Script Web App URL
-                // See setup instructions below
+                // Your deployed Google Apps Script Web App URL
                 SHEETS_API_URL:
                     "https://script.google.com/macros/s/AKfycbzzBAofWSLZ42FdFYz4QVQ9QwHLbKhFLsc9j-olNY51iw1HeQUvkMWlC7-3Ybw8PyDy/exec",
 
                 // Total amount required per person
                 TOTAL_REQUIRED: 3000,
 
+                // Monthly payment amount
+                MONTHLY_AMOUNT: 500,
+
                 // Payment deadline
-                DEADLINE: "July 31, 2026",
+                FINAL_DEADLINE: "July 31, 2026",
 
                 // Google Form URL for payment submission
                 PAYMENT_FORM_URL:
@@ -160,40 +169,152 @@
                     "Z",
                 ],
 
-                // How often to auto-refresh data (in milliseconds, 0 to disable)
-                AUTO_REFRESH_INTERVAL: 0, // Set to 300000 for 5 minutes
+                // Payment schedule - cumulative amounts due after each deadline
+                PAYMENT_SCHEDULE: [
+                    {
+                        month: 1,
+                        day: 28,
+                        year: 2026,
+                        cumulative: 500,
+                        label: "Feb 28",
+                    },
+                    {
+                        month: 2,
+                        day: 31,
+                        year: 2026,
+                        cumulative: 1000,
+                        label: "Mar 31",
+                    },
+                    {
+                        month: 3,
+                        day: 30,
+                        year: 2026,
+                        cumulative: 1500,
+                        label: "Apr 30",
+                    },
+                    {
+                        month: 4,
+                        day: 31,
+                        year: 2026,
+                        cumulative: 2000,
+                        label: "May 31",
+                    },
+                    {
+                        month: 5,
+                        day: 30,
+                        year: 2026,
+                        cumulative: 2500,
+                        label: "Jun 30",
+                    },
+                    {
+                        month: 6,
+                        day: 31,
+                        year: 2026,
+                        cumulative: 3000,
+                        label: "Jul 31",
+                    },
+                ],
 
-                // Enable demo mode with sample data (set to false in production)
+                // Auto-refresh interval (0 to disable)
+                AUTO_REFRESH_INTERVAL: 0,
+
+                // Demo mode
                 DEMO_MODE: false,
             };
 
-            // Sample data for demo/testing (remove in production)
+            // Sample data for demo
             const DEMO_DATA = [
-                { name: "Agawin, Joshua Marvin", block: "A", paid: 3000 },
-                { name: "Dela Cruz, Juan Antonio", block: "A", paid: 1500 },
-                { name: "Santos, Maria Beatriz", block: "A", paid: 0 },
-                { name: "Reyes, Pedro Carlos", block: "B", paid: 3000 },
-                { name: "Garcia, Ana Dominique", block: "B", paid: 500 },
-                { name: "Mendoza, Carlos Eduardo", block: "B", paid: 2000 },
-                { name: "Torres, Lisa Francesca", block: "C", paid: 3000 },
-                { name: "Ramos, Miguel Gabriel", block: "C", paid: 0 },
-                { name: "Bautista, Sofia Helena", block: "C", paid: 1000 },
-                { name: "Villanueva, Marco Ivan", block: "D", paid: 3000 },
-                { name: "Cruz, Angela Joy", block: "D", paid: 2500 },
-                { name: "Fernandez, Luis Karl", block: "D", paid: 0 },
-                { name: "Gonzales, Patricia Mae", block: "E", paid: 3000 },
-                { name: "Lopez, Roberto Neil", block: "E", paid: 500 },
-                { name: "Martinez, Diana Olive", block: "E", paid: 1500 },
-                { name: "Hernandez, Kevin Paul", block: "F", paid: 3000 },
-                { name: "Perez, Samantha Quinn", block: "F", paid: 0 },
-                { name: "Rivera, Antonio Ray", block: "F", paid: 2000 },
-                { name: "Aquino, Bianca Sue", block: "G", paid: 3000 },
-                { name: "Castro, Daniel Troy", block: "G", paid: 1000 },
-                { name: "Flores, Elena Uma", block: "G", paid: 0 },
-                { name: "Morales, Francis Victor", block: "H", paid: 3000 },
-                { name: "Navarro, Grace Wei", block: "H", paid: 500 },
-                { name: "Pascual, Henry Xavier", block: "H", paid: 2500 },
+                { name: "Agawin, Joshua Marvin A.", block: "A", paid: 3000 },
+                { name: "Aquino, Maria Beatriz B.", block: "A", paid: 1500 },
+                { name: "Bautista, Carlos Eduardo C.", block: "A", paid: 500 },
+                { name: "Castillo, Diana Elena D.", block: "A", paid: 0 },
+                { name: "Cruz, Fernando Gabriel E.", block: "B", paid: 3000 },
+                { name: "Dela Cruz, Ana Patricia F.", block: "B", paid: 1000 },
+                { name: "Espino, Luis Miguel G.", block: "B", paid: 500 },
+                { name: "Fernandez, Sofia Isabella H.", block: "B", paid: 0 },
+                { name: "Garcia, Roberto Antonio I.", block: "C", paid: 2500 },
+                { name: "Gonzales, Patricia Marie J.", block: "C", paid: 2000 },
+                { name: "Hernandez, Marco Paolo K.", block: "C", paid: 1500 },
+                { name: "Ignacio, Angela Joy L.", block: "C", paid: 0 },
+                { name: "Jacinto, Kevin Paul M.", block: "D", paid: 3000 },
+                { name: "Lopez, Samantha Nicole N.", block: "D", paid: 500 },
+                { name: "Macario, Daniel Jose O.", block: "D", paid: 0 },
+                { name: "Navarro, Grace Victoria P.", block: "D", paid: 0 },
             ];
+
+            // ============================================================
+            // UTILITY FUNCTIONS
+            // ============================================================
+
+            /**
+             * Calculate expected payment based on current date
+             */
+            function getExpectedPaymentByNow() {
+                const now = new Date();
+                let expectedAmount = 0;
+
+                for (const deadline of CONFIG.PAYMENT_SCHEDULE) {
+                    const deadlineDate = new Date(
+                        deadline.year,
+                        deadline.month,
+                        deadline.day,
+                        23,
+                        59,
+                        59,
+                    );
+                    if (now > deadlineDate) {
+                        expectedAmount = deadline.cumulative;
+                    }
+                }
+
+                return expectedAmount;
+            }
+
+            /**
+             * Get next deadline info
+             */
+            function getNextDeadline() {
+                const now = new Date();
+
+                for (const deadline of CONFIG.PAYMENT_SCHEDULE) {
+                    const deadlineDate = new Date(
+                        deadline.year,
+                        deadline.month,
+                        deadline.day,
+                        23,
+                        59,
+                        59,
+                    );
+                    if (now <= deadlineDate) {
+                        return {
+                            date: deadline.label,
+                            amount: deadline.cumulative,
+                            daysLeft: Math.ceil(
+                                (deadlineDate - now) / (1000 * 60 * 60 * 24),
+                            ),
+                        };
+                    }
+                }
+
+                return {
+                    date: CONFIG.FINAL_DEADLINE,
+                    amount: CONFIG.TOTAL_REQUIRED,
+                    daysLeft: 0,
+                };
+            }
+
+            /**
+             * Determine payment status
+             */
+            function getPaymentStatus(paid, expectedByNow) {
+                if (paid >= CONFIG.TOTAL_REQUIRED) {
+                    return "fully_paid";
+                } else if (paid >= expectedByNow || expectedByNow === 0) {
+                    return "on_track";
+                } else {
+                    return "overdue";
+                }
+            }
 
             // ============================================================
             // MAIN APPLICATION
@@ -208,21 +329,25 @@
                 const [lastUpdated, setLastUpdated] = useState(null);
                 const [showBankDetails, setShowBankDetails] = useState(false);
 
-                // Fetch data from Google Sheets via Apps Script
+                const expectedByNow = useMemo(
+                    () => getExpectedPaymentByNow(),
+                    [],
+                );
+                const nextDeadline = useMemo(() => getNextDeadline(), []);
+
+                // Fetch data
                 const fetchData = async () => {
                     try {
                         setLoading(true);
                         setError(null);
 
                         if (CONFIG.DEMO_MODE) {
-                            // Use demo data
                             await new Promise((resolve) =>
                                 setTimeout(resolve, 800),
-                            ); // Simulate loading
+                            );
                             setData(DEMO_DATA);
                             setLastUpdated(new Date());
                         } else {
-                            // Fetch from Google Apps Script
                             const response = await fetch(CONFIG.SHEETS_API_URL);
                             if (!response.ok)
                                 throw new Error("Failed to fetch data");
@@ -232,7 +357,6 @@
                         }
                     } catch (err) {
                         setError(err.message);
-                        console.error("Fetch error:", err);
                     } finally {
                         setLoading(false);
                     }
@@ -240,8 +364,6 @@
 
                 useEffect(() => {
                     fetchData();
-
-                    // Auto-refresh if enabled
                     if (CONFIG.AUTO_REFRESH_INTERVAL > 0) {
                         const interval = setInterval(
                             fetchData,
@@ -251,23 +373,28 @@
                     }
                 }, []);
 
-                // Process and enrich data
+                // Process data with status calculation
                 const processedData = useMemo(() => {
-                    return data.map((person) => ({
-                        ...person,
-                        remaining: Math.max(
+                    return data.map((person) => {
+                        const paid = person.paid || 0;
+                        const status = getPaymentStatus(paid, expectedByNow);
+                        const overdueAmount = Math.max(0, expectedByNow - paid);
+                        const remaining = Math.max(
                             0,
-                            CONFIG.TOTAL_REQUIRED - person.paid,
-                        ),
-                        progress: (person.paid / CONFIG.TOTAL_REQUIRED) * 100,
-                        status:
-                            person.paid >= CONFIG.TOTAL_REQUIRED
-                                ? "fully_paid"
-                                : person.paid > 0
-                                  ? "partial"
-                                  : "unpaid",
-                    }));
-                }, [data]);
+                            CONFIG.TOTAL_REQUIRED - paid,
+                        );
+                        const progress = (paid / CONFIG.TOTAL_REQUIRED) * 100;
+
+                        return {
+                            ...person,
+                            paid,
+                            status,
+                            overdueAmount,
+                            remaining,
+                            progress,
+                        };
+                    });
+                }, [data, expectedByNow]);
 
                 // Filter data
                 const filteredData = useMemo(() => {
@@ -291,17 +418,21 @@
                     const fullyPaid = processedData.filter(
                         (p) => p.status === "fully_paid",
                     ).length;
-                    const partial = processedData.filter(
-                        (p) => p.status === "partial",
+                    const onTrack = processedData.filter(
+                        (p) => p.status === "on_track",
                     ).length;
-                    const unpaid = processedData.filter(
-                        (p) => p.status === "unpaid",
+                    const overdue = processedData.filter(
+                        (p) => p.status === "overdue",
                     ).length;
                     const collected = processedData.reduce(
                         (sum, p) => sum + p.paid,
                         0,
                     );
                     const expected = total * CONFIG.TOTAL_REQUIRED;
+                    const totalOverdueAmount = processedData.reduce(
+                        (sum, p) => sum + p.overdueAmount,
+                        0,
+                    );
                     const collectionRate =
                         expected > 0
                             ? ((collected / expected) * 100).toFixed(1)
@@ -310,15 +441,16 @@
                     return {
                         total,
                         fullyPaid,
-                        partial,
-                        unpaid,
+                        onTrack,
+                        overdue,
                         collected,
                         expected,
+                        totalOverdueAmount,
                         collectionRate,
                     };
                 }, [processedData]);
 
-                // Block-wise statistics
+                // Block stats
                 const blockStats = useMemo(() => {
                     const blocks = {};
                     CONFIG.BLOCKS.filter((b) => b !== "All").forEach(
@@ -332,6 +464,9 @@
                             );
                             const expected =
                                 blockData.length * CONFIG.TOTAL_REQUIRED;
+                            const overdue = blockData.filter(
+                                (p) => p.status === "overdue",
+                            ).length;
                             blocks[block] = {
                                 total: blockData.length,
                                 collected,
@@ -343,30 +478,39 @@
                                               100
                                           ).toFixed(1)
                                         : 0,
+                                overdue,
                             };
                         },
                     );
                     return blocks;
                 }, [processedData]);
 
-                const getStatusBadge = (status) => {
+                const getStatusBadge = (status, overdueAmount) => {
                     const styles = {
                         fully_paid:
                             "bg-emerald-100 text-emerald-800 border-emerald-200",
-                        partial: "bg-amber-100 text-amber-800 border-amber-200",
-                        unpaid: "bg-red-100 text-red-800 border-red-200",
+                        on_track:
+                            "bg-green-100 text-green-800 border-green-200",
+                        overdue: "bg-red-100 text-red-800 border-red-200",
                     };
                     const labels = {
                         fully_paid: "✅ Fully Paid",
-                        partial: "🔄 Partial",
-                        unpaid: "❌ Unpaid",
+                        on_track: "🟢 On Track",
+                        overdue: `🔴 Overdue`,
                     };
                     return (
-                        <span
-                            className={`px-2.5 py-1 rounded-full text-xs font-medium border ${styles[status]}`}
-                        >
-                            {labels[status]}
-                        </span>
+                        <div className="text-right">
+                            <span
+                                className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium border ${styles[status]}`}
+                            >
+                                {labels[status]}
+                            </span>
+                            {status === "overdue" && overdueAmount > 0 && (
+                                <div className="text-xs text-red-600 font-semibold mt-1">
+                                    -₱{overdueAmount.toLocaleString()}
+                                </div>
+                            )}
+                        </div>
                     );
                 };
 
@@ -378,9 +522,6 @@
                                 <div className="w-16 h-16 mx-auto mb-4 rounded-full loading-shimmer"></div>
                                 <p className="text-masikhay-600 font-medium">
                                     Loading payment data...
-                                </p>
-                                <p className="text-masikhay-400 text-sm mt-1">
-                                    Please wait
                                 </p>
                             </div>
                         </div>
@@ -405,6 +546,35 @@
                                 )}
                             </header>
 
+                            {/* Next Deadline Banner */}
+                            {expectedByNow < CONFIG.TOTAL_REQUIRED && (
+                                <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl p-4 mb-6 text-white shadow-lg">
+                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                                        <div>
+                                            <p className="font-semibold">
+                                                📅 Next Deadline:{" "}
+                                                {nextDeadline.date}
+                                            </p>
+                                            <p className="text-sm opacity-90">
+                                                ₱
+                                                {nextDeadline.amount.toLocaleString()}{" "}
+                                                cumulative payment due
+                                            </p>
+                                        </div>
+                                        {nextDeadline.daysLeft > 0 && (
+                                            <div className="text-right">
+                                                <span className="text-2xl font-bold">
+                                                    {nextDeadline.daysLeft}
+                                                </span>
+                                                <span className="text-sm ml-1">
+                                                    days left
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Error Alert */}
                             {error && (
                                 <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
@@ -414,7 +584,7 @@
                                     <p className="text-sm mt-1">{error}</p>
                                     <button
                                         onClick={fetchData}
-                                        className="mt-2 text-sm underline hover:no-underline"
+                                        className="mt-2 text-sm underline"
                                     >
                                         Try again
                                     </button>
@@ -444,7 +614,7 @@
                                     </div>
                                 </div>
 
-                                {/* Status Counts */}
+                                {/* Fully Paid */}
                                 <button
                                     onClick={() =>
                                         setStatusFilter(
@@ -453,52 +623,87 @@
                                                 : "fully_paid",
                                         )
                                     }
-                                    className={`bg-emerald-50 rounded-xl p-4 shadow-sm border transition-all hover:shadow-md ${statusFilter === "fully_paid" ? "border-emerald-400 ring-2 ring-emerald-200" : "border-emerald-100"}`}
+                                    className={`bg-emerald-50 rounded-xl p-4 shadow-sm border transition-all hover:shadow-md text-left ${statusFilter === "fully_paid" ? "border-emerald-400 ring-2 ring-emerald-200" : "border-emerald-100"}`}
                                 >
                                     <div className="text-2xl font-bold text-emerald-700">
                                         {stats.fullyPaid}
                                     </div>
                                     <div className="text-xs text-emerald-600">
-                                        Fully Paid
+                                        ✅ Fully Paid
                                     </div>
                                 </button>
 
+                                {/* On Track */}
                                 <button
                                     onClick={() =>
                                         setStatusFilter(
-                                            statusFilter === "partial"
+                                            statusFilter === "on_track"
                                                 ? "all"
-                                                : "partial",
+                                                : "on_track",
                                         )
                                     }
-                                    className={`bg-amber-50 rounded-xl p-4 shadow-sm border transition-all hover:shadow-md ${statusFilter === "partial" ? "border-amber-400 ring-2 ring-amber-200" : "border-amber-100"}`}
+                                    className={`bg-green-50 rounded-xl p-4 shadow-sm border transition-all hover:shadow-md text-left ${statusFilter === "on_track" ? "border-green-400 ring-2 ring-green-200" : "border-green-100"}`}
                                 >
-                                    <div className="text-2xl font-bold text-amber-700">
-                                        {stats.partial}
+                                    <div className="text-2xl font-bold text-green-700">
+                                        {stats.onTrack}
                                     </div>
-                                    <div className="text-xs text-amber-600">
-                                        Partial
+                                    <div className="text-xs text-green-600">
+                                        🟢 On Track
                                     </div>
                                 </button>
 
+                                {/* Overdue */}
                                 <button
                                     onClick={() =>
                                         setStatusFilter(
-                                            statusFilter === "unpaid"
+                                            statusFilter === "overdue"
                                                 ? "all"
-                                                : "unpaid",
+                                                : "overdue",
                                         )
                                     }
-                                    className={`bg-red-50 rounded-xl p-4 shadow-sm border transition-all hover:shadow-md ${statusFilter === "unpaid" ? "border-red-400 ring-2 ring-red-200" : "border-red-100"}`}
+                                    className={`bg-red-50 rounded-xl p-4 shadow-sm border transition-all hover:shadow-md text-left ${statusFilter === "overdue" ? "border-red-400 ring-2 ring-red-200" : "border-red-100"}`}
                                 >
                                     <div className="text-2xl font-bold text-red-700">
-                                        {stats.unpaid}
+                                        {stats.overdue}
                                     </div>
                                     <div className="text-xs text-red-600">
-                                        Unpaid
+                                        🔴 Overdue
                                     </div>
+                                    {stats.totalOverdueAmount > 0 && (
+                                        <div className="text-xs text-red-500 mt-1 font-medium pulse">
+                                            ₱
+                                            {stats.totalOverdueAmount.toLocaleString()}{" "}
+                                            total
+                                        </div>
+                                    )}
                                 </button>
                             </div>
+
+                            {/* Expected Payment Info */}
+                            {expectedByNow > 0 && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-blue-800 font-medium">
+                                                📊 Expected payment by now
+                                            </p>
+                                            <p className="text-blue-600 text-sm">
+                                                Based on monthly deadline
+                                                schedule
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-2xl font-bold text-blue-700">
+                                                ₱
+                                                {expectedByNow.toLocaleString()}
+                                            </p>
+                                            <p className="text-xs text-blue-500">
+                                                per intern
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Block Progress */}
                             <div className="bg-white rounded-xl shadow-sm border border-masikhay-100 p-4 mb-6">
@@ -527,12 +732,20 @@
                                             <div className="text-xs font-bold text-masikhay-800">
                                                 Block {block}
                                             </div>
-                                            <div className="text-lg font-bold text-masikhay-600">
+                                            <div
+                                                className={`text-lg font-bold ${blockStats[block]?.overdue > 0 ? "text-red-600" : "text-masikhay-600"}`}
+                                            >
                                                 {blockStats[block]?.rate || 0}%
                                             </div>
+                                            {blockStats[block]?.overdue > 0 && (
+                                                <div className="text-xs text-red-500">
+                                                    {blockStats[block].overdue}{" "}
+                                                    late
+                                                </div>
+                                            )}
                                             <div className="h-1 bg-gray-200 rounded-full mt-1 overflow-hidden">
                                                 <div
-                                                    className="h-full bg-masikhay-500 rounded-full"
+                                                    className={`h-full rounded-full ${blockStats[block]?.overdue > 0 ? "bg-red-500" : "bg-masikhay-500"}`}
                                                     style={{
                                                         width: `${blockStats[block]?.rate || 0}%`,
                                                     }}
@@ -557,7 +770,7 @@
                                             onChange={(e) =>
                                                 setSearchTerm(e.target.value)
                                             }
-                                            className="w-full pl-10 pr-4 py-3 border border-masikhay-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-masikhay-500 focus:border-transparent transition-all"
+                                            className="w-full pl-10 pr-4 py-3 border border-masikhay-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-masikhay-500 focus:border-transparent"
                                         />
                                         {searchTerm && (
                                             <button
@@ -632,15 +845,14 @@
                                                 No results found
                                             </p>
                                             <p className="text-sm mt-1">
-                                                Try a different search term or
-                                                filter
+                                                Try a different search or filter
                                             </p>
                                         </div>
                                     ) : (
                                         filteredData.map((person, index) => (
                                             <div
                                                 key={index}
-                                                className="p-4 hover:bg-masikhay-25 transition-colors fade-in"
+                                                className={`p-4 transition-colors fade-in ${person.status === "overdue" ? "bg-red-50/50 hover:bg-red-50" : "hover:bg-masikhay-25"}`}
                                                 style={{
                                                     animationDelay: `${index * 30}ms`,
                                                 }}
@@ -664,9 +876,9 @@
                                                                     "fully_paid"
                                                                         ? "bg-emerald-500"
                                                                         : person.status ===
-                                                                            "partial"
-                                                                          ? "bg-amber-500"
-                                                                          : "bg-gray-200"
+                                                                            "on_track"
+                                                                          ? "bg-green-500"
+                                                                          : "bg-red-500"
                                                                 }`}
                                                                 style={{
                                                                     width: `${person.progress}%`,
@@ -686,18 +898,31 @@
                                                                 0 && (
                                                                 <span className="text-gray-600">
                                                                     Balance:{" "}
-                                                                    <span className="font-semibold text-red-600">
+                                                                    <span
+                                                                        className={`font-semibold ${person.status === "overdue" ? "text-red-600" : "text-gray-700"}`}
+                                                                    >
                                                                         ₱
                                                                         {person.remaining.toLocaleString()}
                                                                     </span>
                                                                 </span>
                                                             )}
+                                                            {person.status ===
+                                                                "overdue" &&
+                                                                expectedByNow >
+                                                                    0 && (
+                                                                    <span className="text-red-600 text-xs font-medium">
+                                                                        (₱
+                                                                        {person.overdueAmount.toLocaleString()}{" "}
+                                                                        overdue)
+                                                                    </span>
+                                                                )}
                                                         </div>
                                                     </div>
 
                                                     <div className="sm:ml-4">
                                                         {getStatusBadge(
                                                             person.status,
+                                                            person.overdueAmount,
                                                         )}
                                                     </div>
                                                 </div>
@@ -754,16 +979,25 @@
                                     </div>
                                 )}
 
+                                {showBankDetails && (
+                                    <div className="mt-3 text-sm text-purple-300 fade-in">
+                                        💳 GCash / Maya also accepted (same
+                                        account holder)
+                                    </div>
+                                )}
+
                                 <div
                                     className={`${showBankDetails ? "mt-4 pt-4 border-t border-purple-700" : "mt-3"} flex flex-wrap gap-4 text-sm text-purple-200`}
                                 >
                                     <span>
-                                        💰 Total: ₱
+                                        💰 ₱{CONFIG.MONTHLY_AMOUNT}/month
+                                    </span>
+                                    <span>
+                                        📅 Total: ₱
                                         {CONFIG.TOTAL_REQUIRED.toLocaleString()}
                                     </span>
                                     <span>
-                                        ⏰ Deadline: {CONFIG.DEADLINE} (monthly
-                                        deadlines also apply)
+                                        ⏰ Final: {CONFIG.FINAL_DEADLINE}
                                     </span>
                                 </div>
 
@@ -779,6 +1013,81 @@
                                             📝 Submit Payment Proof
                                         </a>
                                     )}
+                            </div>
+
+                            {/* Payment Schedule */}
+                            <div className="bg-white rounded-xl shadow-sm border border-masikhay-100 p-4 mb-6">
+                                <h3 className="text-sm font-semibold text-masikhay-800 mb-3">
+                                    📅 Payment Schedule
+                                </h3>
+                                <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                                    {CONFIG.PAYMENT_SCHEDULE.map(
+                                        (deadline, idx) => {
+                                            const deadlineDate = new Date(
+                                                deadline.year,
+                                                deadline.month,
+                                                deadline.day,
+                                                23,
+                                                59,
+                                                59,
+                                            );
+                                            const now = new Date();
+                                            const isPast = now > deadlineDate;
+                                            const isCurrent =
+                                                !isPast &&
+                                                (idx === 0 ||
+                                                    now >
+                                                        new Date(
+                                                            CONFIG
+                                                                .PAYMENT_SCHEDULE[
+                                                                idx - 1
+                                                            ].year,
+                                                            CONFIG
+                                                                .PAYMENT_SCHEDULE[
+                                                                idx - 1
+                                                            ].month,
+                                                            CONFIG
+                                                                .PAYMENT_SCHEDULE[
+                                                                idx - 1
+                                                            ].day,
+                                                            23,
+                                                            59,
+                                                            59,
+                                                        ));
+
+                                            return (
+                                                <div
+                                                    key={idx}
+                                                    className={`p-2 rounded-lg text-center text-xs ${
+                                                        isPast
+                                                            ? "bg-gray-100 text-gray-500"
+                                                            : isCurrent
+                                                              ? "bg-amber-100 text-amber-800 border-2 border-amber-400"
+                                                              : "bg-masikhay-50 text-masikhay-700"
+                                                    }`}
+                                                >
+                                                    <div className="font-bold">
+                                                        {deadline.label}
+                                                    </div>
+                                                    <div>
+                                                        ₱
+                                                        {deadline.cumulative.toLocaleString()}
+                                                    </div>
+                                                    {isPast && (
+                                                        <div className="text-green-600">
+                                                            ✓
+                                                        </div>
+                                                    )}
+                                                    {isCurrent && (
+                                                        <div className="font-bold">
+                                                            ← NOW
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        },
+                                    )}
+                                </div>
                             </div>
 
                             {/* Footer */}
@@ -802,7 +1111,6 @@
                 );
             }
 
-            // Render the app
             const root = ReactDOM.createRoot(document.getElementById("app"));
             root.render(<App />);
         </script>
