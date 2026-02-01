@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Batch Masikhay 2026 - Payment Tracker</title>
+        <meta
+            name="description"
+            content="Check your graduation payment balance - Batch Masikhay 2026"
+        />
+
+        <!-- Favicon (purple graduation cap emoji as SVG) -->
+        <link
+            rel="icon"
+            href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>"
+        />
+
+        <!-- Tailwind CSS via CDN -->
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        colors: {
+                            masikhay: {
+                                50: "#faf5ff",
+                                100: "#f3e8ff",
+                                200: "#e9d5ff",
+                                300: "#d8b4fe",
+                                400: "#c084fc",
+                                500: "#a855f7",
+                                600: "#9333ea",
+                                700: "#7e22ce",
+                                800: "#6b21a8",
+                                900: "#581c87",
+                            },
+                        },
+                    },
+                },
+            };
+        </script>
+
+        <style>
+            /* Custom animations */
+            @keyframes shimmer {
+                0% {
+                    background-position: -200% 0;
+                }
+                100% {
+                    background-position: 200% 0;
+                }
+            }
+            .loading-shimmer {
+                background: linear-gradient(
+                    90deg,
+                    #f3e8ff 25%,
+                    #e9d5ff 50%,
+                    #f3e8ff 75%
+                );
+                background-size: 200% 100%;
+                animation: shimmer 1.5s infinite;
+            }
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            .fade-in {
+                animation: fadeIn 0.3s ease-out forwards;
+            }
+            /* Smooth scrollbar */
+            ::-webkit-scrollbar {
+                width: 8px;
+                height: 8px;
+            }
+            ::-webkit-scrollbar-track {
+                background: #f3e8ff;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: #c084fc;
+                border-radius: 4px;
+            }
+            ::-webkit-scrollbar-thumb:hover {
+                background: #a855f7;
+            }
+        </style>
+    </head>
+    <body
+        class="min-h-screen bg-gradient-to-br from-masikhay-50 via-white to-indigo-50"
+    >
+        <div id="app"></div>
+
+        <!-- React via CDN -->
+        <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+        <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+        <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+        <script type="text/babel">
+            const { useState, useEffect, useMemo } = React;
+
+            // ============================================================
+            // CONFIGURATION - UPDATE THESE VALUES
+            // ============================================================
+            const CONFIG = {
+                // Replace with your deployed Google Apps Script Web App URL
+                // See setup instructions below
+                SHEETS_API_URL:
+                    "https://script.google.com/macros/s/AKfycbzzBAofWSLZ42FdFYz4QVQ9QwHLbKhFLsc9j-olNY51iw1HeQUvkMWlC7-3Ybw8PyDy/exec",
+
+                // Total amount required per person
+                TOTAL_REQUIRED: 3000,
+
+                // Payment deadline
+                DEADLINE: "July 31, 2026",
+
+                // Google Form URL for payment submission
+                PAYMENT_FORM_URL:
+                    "https://docs.google.com/forms/d/e/1FAIpQLSeuR0PeVlSZixoGj2D2CmrQyfY-A_3TSUs9wy4yx5wH6g1osQ/viewform?usp=dialog",
+
+                // Bank details
+                BANK: {
+                    name: "PSBANK",
+                    accountNumber: "202111003913",
+                    accountName: "Joshua Marvin Agawin",
+                },
+
+                // Blocks available
+                BLOCKS: [
+                    "All",
+                    "A",
+                    "B",
+                    "C",
+                    "D",
+                    "E",
+                    "F",
+                    "G",
+                    "H",
+                    "I",
+                    "J",
+                    "K",
+                    "L",
+                    "M",
+                    "N",
+                    "O",
+                    "P",
+                    "Q",
+                    "R",
+                    "S",
+                    "T",
+                    "U",
+                    "V",
+                    "W",
+                    "X",
+                    "Y",
+                    "Z",
+                ],
+
+                // How often to auto-refresh data (in milliseconds, 0 to disable)
+                AUTO_REFRESH_INTERVAL: 0, // Set to 300000 for 5 minutes
+
+                // Enable demo mode with sample data (set to false in production)
+                DEMO_MODE: false,
+            };
+
+            // Sample data for demo/testing (remove in production)
+            const DEMO_DATA = [
+                { name: "Agawin, Joshua Marvin", block: "A", paid: 3000 },
+                { name: "Dela Cruz, Juan Antonio", block: "A", paid: 1500 },
+                { name: "Santos, Maria Beatriz", block: "A", paid: 0 },
+                { name: "Reyes, Pedro Carlos", block: "B", paid: 3000 },
+                { name: "Garcia, Ana Dominique", block: "B", paid: 500 },
+                { name: "Mendoza, Carlos Eduardo", block: "B", paid: 2000 },
+                { name: "Torres, Lisa Francesca", block: "C", paid: 3000 },
+                { name: "Ramos, Miguel Gabriel", block: "C", paid: 0 },
+                { name: "Bautista, Sofia Helena", block: "C", paid: 1000 },
+                { name: "Villanueva, Marco Ivan", block: "D", paid: 3000 },
+                { name: "Cruz, Angela Joy", block: "D", paid: 2500 },
+                { name: "Fernandez, Luis Karl", block: "D", paid: 0 },
+                { name: "Gonzales, Patricia Mae", block: "E", paid: 3000 },
+                { name: "Lopez, Roberto Neil", block: "E", paid: 500 },
+                { name: "Martinez, Diana Olive", block: "E", paid: 1500 },
+                { name: "Hernandez, Kevin Paul", block: "F", paid: 3000 },
+                { name: "Perez, Samantha Quinn", block: "F", paid: 0 },
+                { name: "Rivera, Antonio Ray", block: "F", paid: 2000 },
+                { name: "Aquino, Bianca Sue", block: "G", paid: 3000 },
+                { name: "Castro, Daniel Troy", block: "G", paid: 1000 },
+                { name: "Flores, Elena Uma", block: "G", paid: 0 },
+                { name: "Morales, Francis Victor", block: "H", paid: 3000 },
+                { name: "Navarro, Grace Wei", block: "H", paid: 500 },
+                { name: "Pascual, Henry Xavier", block: "H", paid: 2500 },
+            ];
+
+            // ============================================================
+            // MAIN APPLICATION
+            // ============================================================
+            function App() {
+                const [data, setData] = useState([]);
+                const [loading, setLoading] = useState(true);
+                const [error, setError] = useState(null);
+                const [searchTerm, setSearchTerm] = useState("");
+                const [selectedBlock, setSelectedBlock] = useState("All");
+                const [statusFilter, setStatusFilter] = useState("all");
+                const [lastUpdated, setLastUpdated] = useState(null);
+                const [showBankDetails, setShowBankDetails] = useState(false);
+
+                // Fetch data from Google Sheets via Apps Script
+                const fetchData = async () => {
+                    try {
+                        setLoading(true);
+                        setError(null);
+
+                        if (CONFIG.DEMO_MODE) {
+                            // Use demo data
+                            await new Promise((resolve) =>
+                                setTimeout(resolve, 800),
+                            ); // Simulate loading
+                            setData(DEMO_DATA);
+                            setLastUpdated(new Date());
+                        } else {
+                            // Fetch from Google Apps Script
+                            const response = await fetch(CONFIG.SHEETS_API_URL);
+                            if (!response.ok)
+                                throw new Error("Failed to fetch data");
+                            const jsonData = await response.json();
+                            setData(jsonData);
+                            setLastUpdated(new Date());
+                        }
+                    } catch (err) {
+                        setError(err.message);
+                        console.error("Fetch error:", err);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+
+                useEffect(() => {
+                    fetchData();
+
+                    // Auto-refresh if enabled
+                    if (CONFIG.AUTO_REFRESH_INTERVAL > 0) {
+                        const interval = setInterval(
+                            fetchData,
+                            CONFIG.AUTO_REFRESH_INTERVAL,
+                        );
+                        return () => clearInterval(interval);
+                    }
+                }, []);
+
+                // Process and enrich data
+                const processedData = useMemo(() => {
+                    return data.map((person) => ({
+                        ...person,
+                        remaining: Math.max(
+                            0,
+                            CONFIG.TOTAL_REQUIRED - person.paid,
+                        ),
+                        progress: (person.paid / CONFIG.TOTAL_REQUIRED) * 100,
+                        status:
+                            person.paid >= CONFIG.TOTAL_REQUIRED
+                                ? "fully_paid"
+                                : person.paid > 0
+                                  ? "partial"
+                                  : "unpaid",
+                    }));
+                }, [data]);
+
+                // Filter data
+                const filteredData = useMemo(() => {
+                    return processedData.filter((person) => {
+                        const matchesSearch = person.name
+                            .toLowerCase()
+                            .includes(searchTerm.toLowerCase());
+                        const matchesBlock =
+                            selectedBlock === "All" ||
+                            person.block === selectedBlock;
+                        const matchesStatus =
+                            statusFilter === "all" ||
+                            person.status === statusFilter;
+                        return matchesSearch && matchesBlock && matchesStatus;
+                    });
+                }, [processedData, searchTerm, selectedBlock, statusFilter]);
+
+                // Calculate statistics
+                const stats = useMemo(() => {
+                    const total = processedData.length;
+                    const fullyPaid = processedData.filter(
+                        (p) => p.status === "fully_paid",
+                    ).length;
+                    const partial = processedData.filter(
+                        (p) => p.status === "partial",
+                    ).length;
+                    const unpaid = processedData.filter(
+                        (p) => p.status === "unpaid",
+                    ).length;
+                    const collected = processedData.reduce(
+                        (sum, p) => sum + p.paid,
+                        0,
+                    );
+                    const expected = total * CONFIG.TOTAL_REQUIRED;
+                    const collectionRate =
+                        expected > 0
+                            ? ((collected / expected) * 100).toFixed(1)
+                            : 0;
+
+                    return {
+                        total,
+                        fullyPaid,
+                        partial,
+                        unpaid,
+                        collected,
+                        expected,
+                        collectionRate,
+                    };
+                }, [processedData]);
+
+                // Block-wise statistics
+                const blockStats = useMemo(() => {
+                    const blocks = {};
+                    CONFIG.BLOCKS.filter((b) => b !== "All").forEach(
+                        (block) => {
+                            const blockData = processedData.filter(
+                                (p) => p.block === block,
+                            );
+                            const collected = blockData.reduce(
+                                (sum, p) => sum + p.paid,
+                                0,
+                            );
+                            const expected =
+                                blockData.length * CONFIG.TOTAL_REQUIRED;
+                            blocks[block] = {
+                                total: blockData.length,
+                                collected,
+                                expected,
+                                rate:
+                                    expected > 0
+                                        ? (
+                                              (collected / expected) *
+                                              100
+                                          ).toFixed(1)
+                                        : 0,
+                            };
+                        },
+                    );
+                    return blocks;
+                }, [processedData]);
+
+                const getStatusBadge = (status) => {
+                    const styles = {
+                        fully_paid:
+                            "bg-emerald-100 text-emerald-800 border-emerald-200",
+                        partial: "bg-amber-100 text-amber-800 border-amber-200",
+                        unpaid: "bg-red-100 text-red-800 border-red-200",
+                    };
+                    const labels = {
+                        fully_paid: "✅ Fully Paid",
+                        partial: "🔄 Partial",
+                        unpaid: "❌ Unpaid",
+                    };
+                    return (
+                        <span
+                            className={`px-2.5 py-1 rounded-full text-xs font-medium border ${styles[status]}`}
+                        >
+                            {labels[status]}
+                        </span>
+                    );
+                };
+
+                // Loading state
+                if (loading && data.length === 0) {
+                    return (
+                        <div className="min-h-screen flex items-center justify-center p-4">
+                            <div className="text-center">
+                                <div className="w-16 h-16 mx-auto mb-4 rounded-full loading-shimmer"></div>
+                                <p className="text-masikhay-600 font-medium">
+                                    Loading payment data...
+                                </p>
+                                <p className="text-masikhay-400 text-sm mt-1">
+                                    Please wait
+                                </p>
+                            </div>
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className="min-h-screen p-4 md:p-6">
+                        <div className="max-w-5xl mx-auto">
+                            {/* Header */}
+                            <header className="text-center mb-6">
+                                <h1 className="text-2xl md:text-3xl font-bold text-masikhay-900 mb-1">
+                                    🎓 Batch Masikhay 2026
+                                </h1>
+                                <p className="text-masikhay-600">
+                                    Graduation Payment Tracker
+                                </p>
+                                {CONFIG.DEMO_MODE && (
+                                    <span className="inline-block mt-2 px-3 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-medium">
+                                        ⚠️ Demo Mode - Sample Data
+                                    </span>
+                                )}
+                            </header>
+
+                            {/* Error Alert */}
+                            {error && (
+                                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
+                                    <p className="font-medium">
+                                        ⚠️ Error loading data
+                                    </p>
+                                    <p className="text-sm mt-1">{error}</p>
+                                    <button
+                                        onClick={fetchData}
+                                        className="mt-2 text-sm underline hover:no-underline"
+                                    >
+                                        Try again
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Stats Overview */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                                {/* Collection Progress */}
+                                <div className="col-span-2 md:col-span-1 bg-white rounded-xl p-4 shadow-sm border border-masikhay-100">
+                                    <div className="text-2xl font-bold text-masikhay-900">
+                                        ₱{stats.collected.toLocaleString()}
+                                    </div>
+                                    <div className="text-xs text-masikhay-500">
+                                        of ₱{stats.expected.toLocaleString()}
+                                    </div>
+                                    <div className="mt-2 h-2 bg-masikhay-100 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-gradient-to-r from-masikhay-500 to-masikhay-600 rounded-full transition-all duration-700"
+                                            style={{
+                                                width: `${stats.collectionRate}%`,
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="text-xs text-masikhay-600 mt-1 font-medium">
+                                        {stats.collectionRate}% collected
+                                    </div>
+                                </div>
+
+                                {/* Status Counts */}
+                                <button
+                                    onClick={() =>
+                                        setStatusFilter(
+                                            statusFilter === "fully_paid"
+                                                ? "all"
+                                                : "fully_paid",
+                                        )
+                                    }
+                                    className={`bg-emerald-50 rounded-xl p-4 shadow-sm border transition-all hover:shadow-md ${statusFilter === "fully_paid" ? "border-emerald-400 ring-2 ring-emerald-200" : "border-emerald-100"}`}
+                                >
+                                    <div className="text-2xl font-bold text-emerald-700">
+                                        {stats.fullyPaid}
+                                    </div>
+                                    <div className="text-xs text-emerald-600">
+                                        Fully Paid
+                                    </div>
+                                </button>
+
+                                <button
+                                    onClick={() =>
+                                        setStatusFilter(
+                                            statusFilter === "partial"
+                                                ? "all"
+                                                : "partial",
+                                        )
+                                    }
+                                    className={`bg-amber-50 rounded-xl p-4 shadow-sm border transition-all hover:shadow-md ${statusFilter === "partial" ? "border-amber-400 ring-2 ring-amber-200" : "border-amber-100"}`}
+                                >
+                                    <div className="text-2xl font-bold text-amber-700">
+                                        {stats.partial}
+                                    </div>
+                                    <div className="text-xs text-amber-600">
+                                        Partial
+                                    </div>
+                                </button>
+
+                                <button
+                                    onClick={() =>
+                                        setStatusFilter(
+                                            statusFilter === "unpaid"
+                                                ? "all"
+                                                : "unpaid",
+                                        )
+                                    }
+                                    className={`bg-red-50 rounded-xl p-4 shadow-sm border transition-all hover:shadow-md ${statusFilter === "unpaid" ? "border-red-400 ring-2 ring-red-200" : "border-red-100"}`}
+                                >
+                                    <div className="text-2xl font-bold text-red-700">
+                                        {stats.unpaid}
+                                    </div>
+                                    <div className="text-xs text-red-600">
+                                        Unpaid
+                                    </div>
+                                </button>
+                            </div>
+
+                            {/* Block Progress */}
+                            <div className="bg-white rounded-xl shadow-sm border border-masikhay-100 p-4 mb-6">
+                                <h3 className="text-sm font-semibold text-masikhay-800 mb-3">
+                                    📊 Collection by Block
+                                </h3>
+                                <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+                                    {CONFIG.BLOCKS.filter(
+                                        (b) => b !== "All",
+                                    ).map((block) => (
+                                        <button
+                                            key={block}
+                                            onClick={() =>
+                                                setSelectedBlock(
+                                                    selectedBlock === block
+                                                        ? "All"
+                                                        : block,
+                                                )
+                                            }
+                                            className={`relative p-2 rounded-lg border transition-all ${
+                                                selectedBlock === block
+                                                    ? "border-masikhay-400 bg-masikhay-50 ring-2 ring-masikhay-200"
+                                                    : "border-gray-200 hover:border-masikhay-300"
+                                            }`}
+                                        >
+                                            <div className="text-xs font-bold text-masikhay-800">
+                                                Block {block}
+                                            </div>
+                                            <div className="text-lg font-bold text-masikhay-600">
+                                                {blockStats[block]?.rate || 0}%
+                                            </div>
+                                            <div className="h-1 bg-gray-200 rounded-full mt-1 overflow-hidden">
+                                                <div
+                                                    className="h-full bg-masikhay-500 rounded-full"
+                                                    style={{
+                                                        width: `${blockStats[block]?.rate || 0}%`,
+                                                    }}
+                                                />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Search and Filters */}
+                            <div className="bg-white rounded-xl shadow-sm border border-masikhay-100 p-4 mb-4">
+                                <div className="flex flex-col md:flex-row gap-3">
+                                    <div className="flex-1 relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                            🔍
+                                        </span>
+                                        <input
+                                            type="text"
+                                            placeholder="Search by name (e.g., Dela Cruz)"
+                                            value={searchTerm}
+                                            onChange={(e) =>
+                                                setSearchTerm(e.target.value)
+                                            }
+                                            className="w-full pl-10 pr-4 py-3 border border-masikhay-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-masikhay-500 focus:border-transparent transition-all"
+                                        />
+                                        {searchTerm && (
+                                            <button
+                                                onClick={() =>
+                                                    setSearchTerm("")
+                                                }
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                            >
+                                                ✕
+                                            </button>
+                                        )}
+                                    </div>
+                                    <select
+                                        value={selectedBlock}
+                                        onChange={(e) =>
+                                            setSelectedBlock(e.target.value)
+                                        }
+                                        className="px-4 py-3 border border-masikhay-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-masikhay-500 bg-white cursor-pointer"
+                                    >
+                                        {CONFIG.BLOCKS.map((block) => (
+                                            <option key={block} value={block}>
+                                                {block === "All"
+                                                    ? "All Blocks"
+                                                    : `Block ${block}`}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {statusFilter !== "all" && (
+                                        <button
+                                            onClick={() =>
+                                                setStatusFilter("all")
+                                            }
+                                            className="px-4 py-2 bg-masikhay-100 text-masikhay-700 rounded-lg hover:bg-masikhay-200 transition-colors text-sm font-medium"
+                                        >
+                                            Clear Filter ✕
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Results List */}
+                            <div className="bg-white rounded-xl shadow-sm border border-masikhay-100 overflow-hidden mb-6">
+                                <div className="px-4 py-3 bg-masikhay-50 border-b border-masikhay-100 flex justify-between items-center">
+                                    <span className="text-sm text-masikhay-700 font-medium">
+                                        {filteredData.length}{" "}
+                                        {filteredData.length === 1
+                                            ? "result"
+                                            : "results"}
+                                        {(searchTerm ||
+                                            selectedBlock !== "All" ||
+                                            statusFilter !== "all") &&
+                                            " (filtered)"}
+                                    </span>
+                                    <button
+                                        onClick={fetchData}
+                                        disabled={loading}
+                                        className="text-sm text-masikhay-600 hover:text-masikhay-800 disabled:opacity-50"
+                                    >
+                                        {loading
+                                            ? "↻ Refreshing..."
+                                            : "↻ Refresh"}
+                                    </button>
+                                </div>
+
+                                <div className="divide-y divide-masikhay-50 max-h-96 overflow-y-auto">
+                                    {filteredData.length === 0 ? (
+                                        <div className="p-8 text-center text-gray-500">
+                                            <div className="text-4xl mb-2">
+                                                🔍
+                                            </div>
+                                            <p className="font-medium">
+                                                No results found
+                                            </p>
+                                            <p className="text-sm mt-1">
+                                                Try a different search term or
+                                                filter
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        filteredData.map((person, index) => (
+                                            <div
+                                                key={index}
+                                                className="p-4 hover:bg-masikhay-25 transition-colors fade-in"
+                                                style={{
+                                                    animationDelay: `${index * 30}ms`,
+                                                }}
+                                            >
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                                                            <span className="font-semibold text-gray-900">
+                                                                {person.name}
+                                                            </span>
+                                                            <span className="text-xs px-2 py-0.5 bg-masikhay-100 text-masikhay-700 rounded-full">
+                                                                Block{" "}
+                                                                {person.block}
+                                                            </span>
+                                                        </div>
+
+                                                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
+                                                            <div
+                                                                className={`h-full rounded-full transition-all duration-500 ${
+                                                                    person.status ===
+                                                                    "fully_paid"
+                                                                        ? "bg-emerald-500"
+                                                                        : person.status ===
+                                                                            "partial"
+                                                                          ? "bg-amber-500"
+                                                                          : "bg-gray-200"
+                                                                }`}
+                                                                style={{
+                                                                    width: `${person.progress}%`,
+                                                                }}
+                                                            />
+                                                        </div>
+
+                                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                                                            <span className="text-gray-600">
+                                                                Paid:{" "}
+                                                                <span className="font-semibold text-gray-900">
+                                                                    ₱
+                                                                    {person.paid.toLocaleString()}
+                                                                </span>
+                                                            </span>
+                                                            {person.remaining >
+                                                                0 && (
+                                                                <span className="text-gray-600">
+                                                                    Balance:{" "}
+                                                                    <span className="font-semibold text-red-600">
+                                                                        ₱
+                                                                        {person.remaining.toLocaleString()}
+                                                                    </span>
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="sm:ml-4">
+                                                        {getStatusBadge(
+                                                            person.status,
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Bank Details Card */}
+                            <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-masikhay-900 rounded-xl p-5 text-white mb-6">
+                                <button
+                                    onClick={() =>
+                                        setShowBankDetails(!showBankDetails)
+                                    }
+                                    className="w-full text-left"
+                                >
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="font-semibold text-purple-200">
+                                            💳 Payment Details
+                                        </h3>
+                                        <span className="text-purple-300">
+                                            {showBankDetails ? "▲" : "▼"}
+                                        </span>
+                                    </div>
+                                </button>
+
+                                {showBankDetails && (
+                                    <div className="mt-4 grid md:grid-cols-3 gap-4 fade-in">
+                                        <div>
+                                            <div className="text-purple-300 text-xs uppercase tracking-wide mb-1">
+                                                Bank
+                                            </div>
+                                            <div className="font-medium text-lg">
+                                                {CONFIG.BANK.name}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="text-purple-300 text-xs uppercase tracking-wide mb-1">
+                                                Account Number
+                                            </div>
+                                            <div className="font-medium font-mono text-lg">
+                                                {CONFIG.BANK.accountNumber}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="text-purple-300 text-xs uppercase tracking-wide mb-1">
+                                                Account Name
+                                            </div>
+                                            <div className="font-medium text-lg">
+                                                {CONFIG.BANK.accountName}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div
+                                    className={`${showBankDetails ? "mt-4 pt-4 border-t border-purple-700" : "mt-3"} flex flex-wrap gap-4 text-sm text-purple-200`}
+                                >
+                                    <span>
+                                        💰 Total: ₱
+                                        {CONFIG.TOTAL_REQUIRED.toLocaleString()}
+                                    </span>
+                                    <span>⏰ Deadline: {CONFIG.DEADLINE}</span>
+                                </div>
+
+                                {CONFIG.PAYMENT_FORM_URL &&
+                                    CONFIG.PAYMENT_FORM_URL !==
+                                        "YOUR_GOOGLE_FORM_URL_HERE" && (
+                                        <a
+                                            href={CONFIG.PAYMENT_FORM_URL}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="mt-4 inline-block px-6 py-3 bg-white text-purple-900 rounded-lg font-semibold hover:bg-purple-100 transition-colors"
+                                        >
+                                            📝 Submit Payment Proof
+                                        </a>
+                                    )}
+                            </div>
+
+                            {/* Footer */}
+                            <footer className="text-center text-sm text-masikhay-500 space-y-2">
+                                {lastUpdated && (
+                                    <p>
+                                        Last updated:{" "}
+                                        {lastUpdated.toLocaleString()}
+                                    </p>
+                                )}
+                                <p>
+                                    After payment, submit your proof via the
+                                    Google Form.
+                                </p>
+                                <p className="text-masikhay-400">
+                                    Mabuhay, Batch Masikhay 2026! 💜
+                                </p>
+                            </footer>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Render the app
+            const root = ReactDOM.createRoot(document.getElementById("app"));
+            root.render(<App />);
+        </script>
+    </body>
+</html>
